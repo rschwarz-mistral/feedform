@@ -7,8 +7,8 @@
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="styles.css">
     <!-- PyScript with MicroPython backend -->
-    <link rel="stylesheet" href="https://pyscript.net/latest/pyscript.css" />
-    <script defer src="https://pyscript.net/latest/pyscript.js"></script>
+    <link rel="stylesheet" href="https://pyscript.net/cdn/2024.10.1/pyscript.css" />
+    <script defer src="https://pyscript.net/cdn/2024.10.1/pyscript.js"></script>
     <!-- Register service worker for offline functionality -->
     <script>
         if ('serviceWorker' in navigator) {
@@ -88,5 +88,18 @@
 
     <!-- Main application logic -->
     <py-script src="main.py"></py-script>
+    
+    <!-- Initialize timestamp immediately with JavaScript as fallback -->
+    <script>
+        // Set initial timestamp immediately so user sees it on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            var timestampInput = document.getElementById('timestamp');
+            if (timestampInput && !timestampInput.value) {
+                var now = new Date();
+                var localDateTime = now.toISOString().slice(0, 16);
+                timestampInput.value = localDateTime;
+            }
+        });
+    </script>
 </body>
 </html>
