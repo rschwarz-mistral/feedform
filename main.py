@@ -167,8 +167,6 @@ def generate_csv():
         # Escape values if needed
         def escape_csv(value):
             value = str(value) if value else ""
-            if "," in value or '"' in value or "\n" in value:
-                value = f'"{value.replace("\"", "\\\""} }"'
             return value
         
         csv_lines.append(f"{escape_csv(timestamp)},{escape_csv(material)},{escape_csv(weight)},{escape_csv(notes)}")
