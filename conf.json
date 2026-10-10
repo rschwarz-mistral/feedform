@@ -1,0 +1,32 @@
+{
+  "app_name": "Feed Form",
+  "version": "0.1.0",
+  "fields": {
+    "scale_readings": [
+      {"id": "weight_1", "label": "Weight 1", "type": "number", "unit": "kg"},
+      {"id": "weight_2", "label": "Weight 2", "type": "number", "unit": "kg"},
+      {"id": "weight_3", "label": "Weight 3", "type": "number", "unit": "kg"},
+      {"id": "weight_4", "label": "Weight 4", "type": "number", "unit": "kg"}
+    ],
+    "material": {
+      "id": "material",
+      "label": "Material",
+      "type": "select",
+      "options": [
+        "Material A",
+        "Material B",
+        "Material C",
+        "Material D",
+        "Material E"
+      ]
+    },
+    "notes": {
+      "id": "notes",
+      "label": "Notes",
+      "type": "text",
+      "required": false
+    }
+  },
+  "storage_key": "feed_form_records",
+  "csv_filename": "feed_form_export.csv"
+}
