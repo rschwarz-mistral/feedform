@@ -1,58 +1,62 @@
 """
 Feed Form - Main application logic
 Offline-first data entry for scale readings and material selection
+
+Configuration is embedded directly in this file for simplicity.
 """
 
 import json
 import js
 from datetime import datetime
 
-# Global configuration
-CONFIG = None
+# =============================================================================
+# CONFIGURATION (previously in conf.json)
+# =============================================================================
+
+CONFIG = {
+    "app_name": "Feed Form",
+    "version": "0.1.0",
+    "fields": {
+        "scale_readings": [
+            {"id": "weight", "label": "Weight", "type": "number", "unit": "kg"}
+        ],
+        "material": {
+            "id": "material",
+            "label": "Feed Type",
+            "type": "select",
+            "options": [
+                "corn",
+                "grass"
+            ]
+        },
+        "notes": {
+            "id": "notes",
+            "label": "Notes",
+            "type": "text",
+            "required": False
+        }
+    },
+    "storage_key": "feed_form_records",
+    "csv_filename": "feed_form_export.csv"
+}
+
+# =============================================================================
+# GLOBAL STATE
+# =============================================================================
+
 RECORDS = []
-STORAGE_KEY = "feed_form_records"
+STORAGE_KEY = CONFIG["storage_key"]
 
 
-def load_config():
-    """Load configuration from conf.json"""
-    global CONFIG
-    config_element = js.document.getElementById("py-script-1")
-    if config_element and hasattr(config_element, 'innerText'):
-        CONFIG = json.loads(config_element.innerText)
-    else:
-        # Fallback: try to fetch from file
-        try:
-            with open("conf.json", "r") as f:
-                CONFIG = json.loads(f.read())
-        except:
-            CONFIG = {
-                "fields": {
-                    "scale_readings": [
-                        {"id": "weight_1", "label": "Weight 1", "type": "number", "unit": "kg"},
-                        {"id": "weight_2", "label": "Weight 2", "type": "number", "unit": "kg"}
-                    ],
-                    "material": {
-                        "id": "material",
-                        "label": "Material",
-                        "type": "select",
-                        "options": ["Material A", "Material B"]
-                    },
-                    "notes": {"id": "notes", "label": "Notes", "type": "text", "required": False}
-                },
-                "storage_key": "feed_form_records",
-                "csv_filename": "feed_form_export.csv"
-            }
-    return CONFIG
-
+# =============================================================================
+# DATA STORAGE
+# =============================================================================
 
 def load_records():
     """Load records from browser localStorage"""
     global RECORDS
-    config = load_config()
-    storage_key = config.get("storage_key", STORAGE_KEY)
-    
     try:
-        stored = js.localStorage.getItem(storage_key)
+        stored = js.localStorage.getItem(STORAGE_KEY)
         if stored:
             RECORDS = json.loads(stored)
         else:
@@ -60,17 +64,13 @@ def load_records():
     except Exception as e:
         print(f"Error loading records: {e}")
         RECORDS = []
-    
     return RECORDS
 
 
 def save_records():
     """Save records to browser localStorage"""
-    config = load_config()
-    storage_key = config.get("storage_key", STORAGE_KEY)
-    
     try:
-        js.localStorage.setItem(storage_key, json.dumps(RECORDS))
+        js.localStorage.setItem(STORAGE_KEY, json.dumps(RECORDS))
         return True
     except Exception as e:
         print(f"Error saving records: {e}")
@@ -90,11 +90,8 @@ def add_record(record):
 def clear_all_records():
     """Clear all stored records"""
     global RECORDS
-    config = load_config()
-    storage_key = config.get("storage_key", STORAGE_KEY)
-    
     try:
-        js.localStorage.removeItem(storage_key)
+        js.localStorage.removeItem(STORAGE_KEY)
         RECORDS = []
         update_record_count()
         show_status("All records cleared", "success")
@@ -113,6 +110,10 @@ def update_record_count():
         count_element.innerText = str(len(RECORDS))
 
 
+# =============================================================================
+# UI HELPERS
+# =============================================================================
+
 def show_status(message, status_type="info"):
     """Show a status message in the status bar"""
     status_bar = js.document.getElementById("status-bar")
@@ -128,10 +129,13 @@ def show_status(message, status_type="info"):
         js.setTimeout(hide_status, 3000)
 
 
+# =============================================================================
+# FORM DATA HANDLING
+# =============================================================================
+
 def get_form_data():
     """Extract form data from the HTML form"""
-    config = load_config()
-    fields = config.get("fields", {})
+    fields = CONFIG.get("fields", {})
     
     record = {
         "timestamp": js.document.getElementById("timestamp").value
@@ -171,8 +175,7 @@ def get_form_data():
 
 def validate_form():
     """Validate form inputs"""
-    config = load_config()
-    fields = config.get("fields", {})
+    fields = CONFIG.get("fields", {})
     
     # Check required material
     material_field = fields.get("material", {})
@@ -208,8 +211,7 @@ def validate_form():
 
 def clear_form():
     """Clear the form fields"""
-    config = load_config()
-    fields = config.get("fields", {})
+    fields = CONFIG.get("fields", {})
     
     # Clear timestamp
     timestamp_element = js.document.getElementById("timestamp")
@@ -241,17 +243,21 @@ def clear_form():
     show_status("Form cleared", "success")
 
 
+# =============================================================================
+# CSV EXPORT
+# =============================================================================
+
 def generate_csv():
     """Generate CSV data from stored records"""
     load_records()
-    config = load_config()
     
     if not RECORDS:
         show_status("No records to export", "error")
         return None
     
+    fields = CONFIG.get("fields", {})
+    
     # Build header row
-    fields = config.get("fields", {})
     header = ["timestamp"]
     
     # Add material column
@@ -310,10 +316,9 @@ def generate_csv():
     return "\n".join(csv_lines)
 
 
-def trigger_download(csv_data, filename):
+def trigger_download(csv_data):
     """Trigger a file download in the browser"""
-    config = load_config()
-    csv_filename = config.get("csv_filename", filename)
+    csv_filename = CONFIG.get("csv_filename", "feed_form_export.csv")
     
     blob = js.Blob.new([csv_data], {"type": "text/csv"})
     url = js.URL.createObjectURL(blob)
@@ -331,32 +336,17 @@ def export_csv(event=None):
     """Export records as CSV file"""
     csv_data = generate_csv()
     if csv_data:
-        config = load_config()
-        filename = config.get("csv_filename", "feed_form_export.csv")
-        trigger_download(csv_data, filename)
+        trigger_download(csv_data)
         show_status(f"Exported {len(RECORDS)} records", "success")
 
 
-def save_entry(event=None):
-    """Save the current form entry"""
-    if not validate_form():
-        return
-    
-    record = get_form_data()
-    
-    # Ensure timestamp is set
-    if not record.get("timestamp"):
-        record["timestamp"] = datetime.now().isoformat()
-    
-    add_record(record)
-    clear_form()
-    show_status("Entry saved", "success")
-
+# =============================================================================
+# FORM INITIALIZATION
+# =============================================================================
 
 def init_form():
     """Initialize the form with field definitions from config"""
-    config = load_config()
-    fields = config.get("fields", {})
+    fields = CONFIG.get("fields", {})
     
     # Set up timestamp with current time
     timestamp_element = js.document.getElementById("timestamp")
@@ -447,9 +437,28 @@ def setup_event_handlers():
         clear_all_btn.addEventListener("click", confirm_clear)
 
 
+def save_entry(event=None):
+    """Save the current form entry"""
+    if not validate_form():
+        return
+    
+    record = get_form_data()
+    
+    # Ensure timestamp is set
+    if not record.get("timestamp"):
+        record["timestamp"] = datetime.now().isoformat()
+    
+    add_record(record)
+    clear_form()
+    show_status("Entry saved", "success")
+
+
+# =============================================================================
+# MAIN
+# =============================================================================
+
 def main():
     """Main initialization function"""
-    load_config()
     load_records()
     init_form()
     setup_event_handlers()
