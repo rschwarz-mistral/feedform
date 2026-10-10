@@ -9,6 +9,14 @@
     <!-- PyScript with MicroPython backend -->
     <link rel="stylesheet" href="https://pyscript.net/latest/pyscript.css" />
     <script defer src="https://pyscript.net/latest/pyscript.js"></script>
+    <!-- Register service worker for offline functionality -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js');
+            });
+        }
+    </script>
 </head>
 <body>
     <div class="container">
@@ -76,8 +84,6 @@
         paths = [".", "/"]
     </py-config>
 
-    <!-- Load configuration -->
-    <py-script src="conf.json" type="json"></py-script>
     <!-- Main application logic -->
     <py-script src="main.py"></py-script>
 </body>
