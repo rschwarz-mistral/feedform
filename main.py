@@ -1,8 +1,6 @@
 """
 Feed Form - Main application logic
-Offline-first data entry for scale readings and material selection
-
-Configuration is embedded directly in this file for simplicity.
+Offline-first data entry for feed type and weight
 """
 
 import json
@@ -10,42 +8,11 @@ import js
 from datetime import datetime
 
 # =============================================================================
-# CONFIGURATION (previously in conf.json)
-# =============================================================================
-
-CONFIG = {
-    "app_name": "Feed Form",
-    "version": "0.1.0",
-    "fields": {
-        "scale_readings": [
-            {"id": "weight", "label": "Weight", "type": "number", "unit": "kg"}
-        ],
-        "material": {
-            "id": "material",
-            "label": "Feed Type",
-            "type": "select",
-            "options": [
-                "corn",
-                "grass"
-            ]
-        },
-        "notes": {
-            "id": "notes",
-            "label": "Notes",
-            "type": "text",
-            "required": False
-        }
-    },
-    "storage_key": "feed_form_records",
-    "csv_filename": "feed_form_export.csv"
-}
-
-# =============================================================================
 # GLOBAL STATE
 # =============================================================================
 
+STORAGE_KEY = "feed_form_records"
 RECORDS = []
-STORAGE_KEY = CONFIG["storage_key"]
 
 
 # =============================================================================
@@ -135,74 +102,30 @@ def show_status(message, status_type="info"):
 
 def get_form_data():
     """Extract form data from the HTML form"""
-    fields = CONFIG.get("fields", {})
-    
     record = {
-        "timestamp": js.document.getElementById("timestamp").value
+        "timestamp": js.document.getElementById("timestamp").value,
+        "material": js.document.getElementById("material").value,
+        "weight": js.document.getElementById("weight").value,
+        "notes": js.document.getElementById("notes").value
     }
-    
-    # Get material selection
-    material_field = fields.get("material", {})
-    material_id = material_field.get("id", "material")
-    material_element = js.document.getElementById(material_id)
-    if material_element:
-        record[material_id] = material_element.value
-    
-    # Get scale readings
-    scale_readings = fields.get("scale_readings", [])
-    for reading in scale_readings:
-        field_id = reading.get("id", "")
-        element = js.document.getElementById(field_id)
-        if element:
-            value = element.value
-            if value:
-                try:
-                    record[field_id] = float(value)
-                except:
-                    record[field_id] = value
-            else:
-                record[field_id] = None
-    
-    # Get notes
-    notes_field = fields.get("notes", {})
-    notes_id = notes_field.get("id", "notes")
-    notes_element = js.document.getElementById(notes_id)
-    if notes_element:
-        record[notes_id] = notes_element.value
-    
     return record
 
 
 def validate_form():
     """Validate form inputs"""
-    fields = CONFIG.get("fields", {})
+    material = js.document.getElementById("material").value
+    weight = js.document.getElementById("weight").value
+    timestamp = js.document.getElementById("timestamp").value
     
-    # Check required material
-    material_field = fields.get("material", {})
-    material_id = material_field.get("id", "material")
-    material_element = js.document.getElementById(material_id)
-    
-    if not material_element or not material_element.value:
-        show_status("Please select a material", "error")
+    if not material:
+        show_status("Please select a feed type", "error")
         return False
     
-    # Check at least one scale reading
-    scale_readings = fields.get("scale_readings", [])
-    has_reading = False
-    for reading in scale_readings:
-        field_id = reading.get("id", "")
-        element = js.document.getElementById(field_id)
-        if element and element.value:
-            has_reading = True
-            break
-    
-    if not has_reading:
-        show_status("Please enter at least one scale reading", "error")
+    if not weight:
+        show_status("Please enter a weight", "error")
         return False
     
-    # Check timestamp
-    timestamp_element = js.document.getElementById("timestamp")
-    if not timestamp_element or not timestamp_element.value:
+    if not timestamp:
         show_status("Please enter a timestamp", "error")
         return False
     
@@ -211,35 +134,10 @@ def validate_form():
 
 def clear_form():
     """Clear the form fields"""
-    fields = CONFIG.get("fields", {})
-    
-    # Clear timestamp
-    timestamp_element = js.document.getElementById("timestamp")
-    if timestamp_element:
-        timestamp_element.value = ""
-    
-    # Clear material
-    material_field = fields.get("material", {})
-    material_id = material_field.get("id", "material")
-    material_element = js.document.getElementById(material_id)
-    if material_element:
-        material_element.value = ""
-    
-    # Clear scale readings
-    scale_readings = fields.get("scale_readings", [])
-    for reading in scale_readings:
-        field_id = reading.get("id", "")
-        element = js.document.getElementById(field_id)
-        if element:
-            element.value = ""
-    
-    # Clear notes
-    notes_field = fields.get("notes", {})
-    notes_id = notes_field.get("id", "notes")
-    notes_element = js.document.getElementById(notes_id)
-    if notes_element:
-        notes_element.value = ""
-    
+    js.document.getElementById("timestamp").value = datetime.now().strftime("%Y-%m-%dT%H:%M")
+    js.document.getElementById("material").value = ""
+    js.document.getElementById("weight").value = ""
+    js.document.getElementById("notes").value = ""
     show_status("Form cleared", "success")
 
 
@@ -255,77 +153,34 @@ def generate_csv():
         show_status("No records to export", "error")
         return None
     
-    fields = CONFIG.get("fields", {})
-    
-    # Build header row
-    header = ["timestamp"]
-    
-    # Add material column
-    material_field = fields.get("material", {})
-    material_id = material_field.get("id", "material")
-    header.append(material_id)
-    
-    # Add scale reading columns
-    scale_readings = fields.get("scale_readings", [])
-    for reading in scale_readings:
-        header.append(reading.get("id", ""))
-    
-    # Add notes column
-    notes_field = fields.get("notes", {})
-    notes_id = notes_field.get("id", "notes")
-    header.append(notes_id)
-    
-    # Build data rows
-    rows = []
-    for record in RECORDS:
-        row = []
-        
-        # Timestamp
-        ts = record.get("timestamp", "")
-        row.append(ts)
-        
-        # Material
-        row.append(record.get(material_id, ""))
-        
-        # Scale readings
-        for reading in scale_readings:
-            field_id = reading.get("id", "")
-            value = record.get(field_id, "")
-            if isinstance(value, (int, float)):
-                row.append(str(value))
-            else:
-                row.append(str(value) if value else "")
-        
-        # Notes
-        row.append(record.get(notes_id, ""))
-        
-        rows.append(row)
-    
     # Build CSV content
-    csv_lines = [",".join(header)]
-    for row in rows:
-        # Escape commas and quotes
-        escaped_row = []
-        for cell in row:
-            cell_str = str(cell) if cell else ""
-            if "," in cell_str or '"' in cell_str or "\n" in cell_str:
-                cell_str = f'"{cell_str.replace("\"", "\\\"")}"'
-            escaped_row.append(cell_str)
-        csv_lines.append(",".join(escaped_row))
+    csv_lines = ["timestamp,material,weight,notes"]
+    for record in RECORDS:
+        timestamp = record.get("timestamp", "")
+        material = record.get("material", "")
+        weight = record.get("weight", "")
+        notes = record.get("notes", "")
+        
+        # Escape values if needed
+        def escape_csv(value):
+            value = str(value) if value else ""
+            if "," in value or '"' in value or "\n" in value:
+                value = f'"{value.replace("\"", "\\\""} }"'
+            return value
+        
+        csv_lines.append(f"{escape_csv(timestamp)},{escape_csv(material)},{escape_csv(weight)},{escape_csv(notes)}")
     
     return "\n".join(csv_lines)
 
 
 def trigger_download(csv_data):
     """Trigger a file download in the browser"""
-    csv_filename = CONFIG.get("csv_filename", "feed_form_export.csv")
-    
     blob = js.Blob.new([csv_data], {"type": "text/csv"})
     url = js.URL.createObjectURL(blob)
     
     a = js.document.createElement("a")
     a.href = url
-    a.download = csv_filename
+    a.download = "feed_form_export.csv"
     js.document.body.appendChild(a)
     a.click()
     js.document.body.removeChild(a)
@@ -341,100 +196,30 @@ def export_csv(event=None):
 
 
 # =============================================================================
-# FORM INITIALIZATION
+# MAIN
 # =============================================================================
 
-def init_form():
-    """Initialize the form with field definitions from config"""
-    fields = CONFIG.get("fields", {})
+def main():
+    """Main initialization function"""
+    load_records()
     
-    # Set up timestamp with current time
-    timestamp_element = js.document.getElementById("timestamp")
-    if timestamp_element:
-        timestamp_element.value = datetime.now().strftime("%Y-%m-%dT%H:%M")
+    # Set current timestamp
+    js.document.getElementById("timestamp").value = datetime.now().strftime("%Y-%m-%dT%H:%M")
     
-    # Populate material dropdown
-    material_field = fields.get("material", {})
-    material_id = material_field.get("id", "material")
-    material_element = js.document.getElementById(material_id)
-    if material_element:
-        options = material_field.get("options", [])
-        material_element.innerHTML = ""
-        
-        # Add default empty option
-        option = js.document.createElement("option")
-        option.value = ""
-        option.text = "-- Select Material --"
-        material_element.appendChild(option)
-        
-        for opt in options:
-            option = js.document.createElement("option")
-            option.value = opt
-            option.text = opt
-            material_element.appendChild(option)
+    # Set up event handlers
+    js.document.getElementById("save-btn").addEventListener("click", save_entry)
+    js.document.getElementById("clear-btn").addEventListener("click", clear_form)
+    js.document.getElementById("export-btn").addEventListener("click", export_csv)
     
-    # Create scale reading fields
-    scale_readings = fields.get("scale_readings", [])
-    scale_fields_container = js.document.getElementById("scale-fields")
-    if scale_fields_container and scale_readings:
-        scale_fields_container.innerHTML = ""
-        
-        for reading in scale_readings:
-            field_id = reading.get("id", "")
-            label = reading.get("label", field_id)
-            unit = reading.get("unit", "")
-            
-            # Create field container
-            field_div = js.document.createElement("div")
-            field_div.className = "scale-field"
-            
-            # Create label
-            label_element = js.document.createElement("label")
-            label_element.htmlFor = field_id
-            label_element.textContent = f"{label} ({unit})"
-            field_div.appendChild(label_element)
-            
-            # Create input
-            input_element = js.document.createElement("input")
-            input_element.type = "number"
-            input_element.id = field_id
-            input_element.className = "form-control"
-            input_element.step = "0.01"
-            input_element.placeholder = "0.00"
-            field_div.appendChild(input_element)
-            
-            scale_fields_container.appendChild(field_div)
+    def confirm_clear(event):
+        result = js.confirm("Are you sure you want to clear ALL records? This cannot be undone.")
+        if result:
+            clear_all_records()
     
-    # Update record count
+    js.document.getElementById("clear-all-btn").addEventListener("click", confirm_clear)
+    
     update_record_count()
-
-
-def setup_event_handlers():
-    """Set up event handlers for form buttons"""
-    # Save button
-    save_btn = js.document.getElementById("save-btn")
-    if save_btn:
-        save_btn.addEventListener("click", save_entry)
-    
-    # Clear form button
-    clear_btn = js.document.getElementById("clear-btn")
-    if clear_btn:
-        clear_btn.addEventListener("click", clear_form)
-    
-    # Export button
-    export_btn = js.document.getElementById("export-btn")
-    if export_btn:
-        export_btn.addEventListener("click", export_csv)
-    
-    # Clear all button
-    clear_all_btn = js.document.getElementById("clear-all-btn")
-    if clear_all_btn:
-        def confirm_clear(event):
-            result = js.confirm("Are you sure you want to clear ALL records? This cannot be undone.")
-            if result:
-                clear_all_records()
-        
-        clear_all_btn.addEventListener("click", confirm_clear)
+    show_status("Feed Form ready", "success")
 
 
 def save_entry(event=None):
@@ -443,26 +228,9 @@ def save_entry(event=None):
         return
     
     record = get_form_data()
-    
-    # Ensure timestamp is set
-    if not record.get("timestamp"):
-        record["timestamp"] = datetime.now().isoformat()
-    
     add_record(record)
     clear_form()
     show_status("Entry saved", "success")
-
-
-# =============================================================================
-# MAIN
-# =============================================================================
-
-def main():
-    """Main initialization function"""
-    load_records()
-    init_form()
-    setup_event_handlers()
-    show_status("Feed Form ready", "success")
 
 
 # Run main when DOM is loaded
