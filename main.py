@@ -4,8 +4,9 @@ Offline-first data entry for feed type and weight
 """
 
 import json
-import js
 from datetime import datetime
+from js import document, localStorage
+from pyodide.ffi import create_proxy
 
 # =============================================================================
 # GLOBAL STATE
@@ -23,7 +24,7 @@ def load_records():
     """Load records from browser localStorage"""
     global RECORDS
     try:
-        stored = js.localStorage.getItem(STORAGE_KEY)
+        stored = localStorage.getItem(STORAGE_KEY)
         if stored:
             RECORDS = json.loads(stored)
         else:
@@ -37,7 +38,7 @@ def load_records():
 def save_records():
     """Save records to browser localStorage"""
     try:
-        js.localStorage.setItem(STORAGE_KEY, json.dumps(RECORDS))
+        localStorage.setItem(STORAGE_KEY, json.dumps(RECORDS))
         return True
     except Exception as e:
         print(f"Error saving records: {e}")
@@ -58,7 +59,7 @@ def clear_all_records():
     """Clear all stored records"""
     global RECORDS
     try:
-        js.localStorage.removeItem(STORAGE_KEY)
+        localStorage.removeItem(STORAGE_KEY)
         RECORDS = []
         update_record_count()
         show_status("All records cleared", "success")
@@ -72,7 +73,7 @@ def clear_all_records():
 def update_record_count():
     """Update the displayed record count"""
     load_records()
-    count_element = js.document.getElementById("record-count")
+    count_element = document.getElementById("record-count")
     if count_element:
         count_element.innerText = str(len(RECORDS))
 
@@ -83,7 +84,7 @@ def update_record_count():
 
 def show_status(message, status_type="info"):
     """Show a status message in the status bar"""
-    status_bar = js.document.getElementById("status-bar")
+    status_bar = document.getElementById("status-bar")
     if status_bar:
         status_bar.innerText = message
         status_bar.className = f"status-bar {status_type} show"
@@ -93,7 +94,9 @@ def show_status(message, status_type="info"):
             if status_bar:
                 status_bar.className = f"status-bar {status_type}"
         
-        js.setTimeout(hide_status, 3000)
+        # Use setTimeout via js
+        from js import setTimeout
+        setTimeout(create_proxy(hide_status), 3000)
 
 
 # =============================================================================
@@ -103,19 +106,19 @@ def show_status(message, status_type="info"):
 def get_form_data():
     """Extract form data from the HTML form"""
     record = {
-        "timestamp": js.document.getElementById("timestamp").value,
-        "material": js.document.getElementById("material").value,
-        "weight": js.document.getElementById("weight").value,
-        "notes": js.document.getElementById("notes").value
+        "timestamp": document.getElementById("timestamp").value,
+        "material": document.getElementById("material").value,
+        "weight": document.getElementById("weight").value,
+        "notes": document.getElementById("notes").value
     }
     return record
 
 
 def validate_form():
     """Validate form inputs"""
-    material = js.document.getElementById("material").value
-    weight = js.document.getElementById("weight").value
-    timestamp = js.document.getElementById("timestamp").value
+    material = document.getElementById("material").value
+    weight = document.getElementById("weight").value
+    timestamp = document.getElementById("timestamp").value
     
     if not material:
         show_status("Please select a feed type", "error")
@@ -134,10 +137,10 @@ def validate_form():
 
 def clear_form():
     """Clear the form fields"""
-    js.document.getElementById("timestamp").value = datetime.now().strftime("%Y-%m-%dT%H:%M")
-    js.document.getElementById("material").value = ""
-    js.document.getElementById("weight").value = ""
-    js.document.getElementById("notes").value = ""
+    document.getElementById("timestamp").value = datetime.now().strftime("%Y-%m-%dT%H:%M")
+    document.getElementById("material").value = ""
+    document.getElementById("weight").value = ""
+    document.getElementById("notes").value = ""
     show_status("Form cleared", "success")
 
 
@@ -175,16 +178,17 @@ def generate_csv():
 
 def trigger_download(csv_data):
     """Trigger a file download in the browser"""
-    blob = js.Blob.new([csv_data], {"type": "text/csv"})
-    url = js.URL.createObjectURL(blob)
+    from js import Blob, URL, document
+    blob = Blob.new([csv_data], {"type": "text/csv"})
+    url = URL.createObjectURL(blob)
     
-    a = js.document.createElement("a")
+    a = document.createElement("a")
     a.href = url
     a.download = "feed_form_export.csv"
-    js.document.body.appendChild(a)
+    document.body.appendChild(a)
     a.click()
-    js.document.body.removeChild(a)
-    js.URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
 
 
 def export_csv(event=None):
@@ -196,31 +200,8 @@ def export_csv(event=None):
 
 
 # =============================================================================
-# MAIN
+# EVENT HANDLERS
 # =============================================================================
-
-def main():
-    """Main initialization function"""
-    load_records()
-    
-    # Set current timestamp
-    js.document.getElementById("timestamp").value = datetime.now().strftime("%Y-%m-%dT%H:%M")
-    
-    # Set up event handlers
-    js.document.getElementById("save-btn").addEventListener("click", save_entry)
-    js.document.getElementById("clear-btn").addEventListener("click", clear_form)
-    js.document.getElementById("export-btn").addEventListener("click", export_csv)
-    
-    def confirm_clear(event):
-        result = js.confirm("Are you sure you want to clear ALL records? This cannot be undone.")
-        if result:
-            clear_all_records()
-    
-    js.document.getElementById("clear-all-btn").addEventListener("click", confirm_clear)
-    
-    update_record_count()
-    show_status("Feed Form ready", "success")
-
 
 def save_entry(event=None):
     """Save the current form entry"""
@@ -233,5 +214,47 @@ def save_entry(event=None):
     show_status("Entry saved", "success")
 
 
-# Run main when DOM is loaded
-js.document.addEventListener("DOMContentLoaded", main)
+def confirm_clear_all(event=None):
+    """Confirm and clear all records"""
+    from js import confirm
+    result = confirm("Are you sure you want to clear ALL records? This cannot be undone.")
+    if result:
+        clear_all_records()
+
+
+# =============================================================================
+# INITIALIZATION
+# =============================================================================
+
+def init():
+    """Initialize the application"""
+    load_records()
+    
+    # Set current timestamp
+    timestamp_element = document.getElementById("timestamp")
+    if timestamp_element:
+        timestamp_element.value = datetime.now().strftime("%Y-%m-%dT%H:%M")
+    
+    # Set up event handlers using PyScript's Element API
+    save_btn = document.getElementById("save-btn")
+    if save_btn:
+        save_btn.addEventListener("click", create_proxy(save_entry))
+    
+    clear_btn = document.getElementById("clear-btn")
+    if clear_btn:
+        clear_btn.addEventListener("click", create_proxy(clear_form))
+    
+    export_btn = document.getElementById("export-btn")
+    if export_btn:
+        export_btn.addEventListener("click", create_proxy(export_csv))
+    
+    clear_all_btn = document.getElementById("clear-all-btn")
+    if clear_all_btn:
+        clear_all_btn.addEventListener("click", create_proxy(confirm_clear_all))
+    
+    update_record_count()
+    show_status("Feed Form ready", "success")
+
+
+# Initialize when the script loads
+init()
